@@ -10,3 +10,13 @@ python-docx
 pydantic
 pydantic-settings
 python-dotenv
+realtimetts[kokoro]
+torch
+torchaudio
+numpy
+scipy
+sse-starlette
+nest-asyncio
+tenacity
+prometheus-client
+websockets

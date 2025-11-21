@@ -6,6 +6,7 @@ import './UploadScreen.css';
 const UploadScreen = ({ onInterviewStart }) => {
   const [resume, setResume] = useState(null);
   const [jobDescription, setJobDescription] = useState(null);
+  const [customInstructions, setCustomInstructions] = useState('');
   const [resumeDragActive, setResumeDragActive] = useState(false);
   const [jobDescDragActive, setJobDescDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -92,6 +93,7 @@ const UploadScreen = ({ onInterviewStart }) => {
       const formData = new FormData();
       formData.append('resume', resume);
       formData.append('job_description', jobDescription);
+      formData.append('custom_instructions', customInstructions);
 
       const uploadResponse = await axios.post(
         `${API_BASE_URL}${API_ENDPOINTS.UPLOAD_DOCUMENTS}`,
@@ -112,11 +114,13 @@ const UploadScreen = ({ onInterviewStart }) => {
       );
 
       const firstQuestion = interviewResponse.data.first_question;
+      const audioChunks = interviewResponse.data.audio_chunks || [];
 
-      // Pass session ID and first question to parent
+      // Pass session ID, first question, and audio to parent
       onInterviewStart({
         sessionId,
         firstQuestion,
+        audioChunks,
         startTime: Date.now(),
       });
     } catch (err) {
@@ -236,6 +240,48 @@ const UploadScreen = ({ onInterviewStart }) => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Custom Instructions Section */}
+        <div className="custom-instructions-section">
+          <div className="section-header">
+            <h2>Custom Instructions (Optional)</h2>
+          </div>
+          <p className="helper-text">
+            Provide specific guidance for the interview (e.g., focus areas, topics to emphasize, depth of technical questions)
+          </p>
+          <textarea
+            className="custom-instructions-textarea"
+            placeholder="Enter custom instructions for the interview (optional)..."
+            value={customInstructions}
+            onChange={(e) => setCustomInstructions(e.target.value)}
+            rows={6}
+            aria-label="Custom interview instructions"
+          />
+          <div className="character-counter-container">
+            <span
+              className={`character-counter ${
+                (customInstructions.length > 0 && customInstructions.length < 10) ||
+                customInstructions.length > 2000
+                  ? 'character-warning'
+                  : ''
+              }`}
+            >
+              {customInstructions.length} characters
+            </span>
+          </div>
+          {customInstructions.length > 0 && customInstructions.length < 10 && (
+            <div className="length-warning">
+              <span className="warning-icon">⚠️</span>
+              Instructions seem very short
+            </div>
+          )}
+          {customInstructions.length > 2000 && (
+            <div className="length-warning">
+              <span className="warning-icon">⚠️</span>
+              Instructions are quite long, consider condensing
+            </div>
+          )}
         </div>
 
         <button

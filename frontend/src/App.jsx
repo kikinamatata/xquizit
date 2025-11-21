@@ -18,6 +18,7 @@ function App() {
         <ChatInterface
           sessionId={interviewData.sessionId}
           firstQuestion={interviewData.firstQuestion}
+          firstQuestionAudio={interviewData.audioChunks}
           startTime={interviewData.startTime}
         />
       )}

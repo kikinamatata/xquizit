@@ -7,6 +7,7 @@ import os
 import sys
 import signal
 import time
+import argparse
 from pathlib import Path
 
 
@@ -95,6 +96,20 @@ def check_dependencies():
 
 def main():
     """Main entry point."""
+    # No command-line arguments needed - V3 is always used
+    parser = argparse.ArgumentParser(
+        description="Screening Interview Chatbot - Backend Server (V3 Architecture)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+The backend now exclusively uses the V3 Hybrid Modular State Machine architecture with:
+  - Conversational turn handling (clarifications, thinking, acknowledgments)
+  - Strategic time allocation (priority-based, no hard limits)
+  - Quality-driven follow-ups (unlimited, based on coverage + confidence)
+  - Intelligent topic selection (multi-factor scoring algorithm)
+        """
+    )
+    args = parser.parse_args()
+
     print("=" * 60)
     print("  Screening Interview Chatbot - Backend Server")
     print("=" * 60)
@@ -110,6 +125,15 @@ def main():
     # Register signal handlers for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+    # V3 is always used (Hybrid Modular State Machine Architecture)
+    print("✓ V3 Hybrid Modular State Machine Architecture")
+    print("  🎯 Advanced conversational interview system")
+    print("  - ✓ Conversational turn handling (clarifications, thinking, acknowledgments)")
+    print("  - ✓ Strategic time allocation (priority-based, no hard limits)")
+    print("  - ✓ Quality-driven follow-ups (unlimited, based on coverage + confidence)")
+    print("  - ✓ Intelligent topic selection (multi-factor scoring)")
+    print()
 
     # Check for development mode reload option
     enable_reload = os.getenv("UVICORN_RELOAD", "false").lower() == "true"
@@ -136,7 +160,7 @@ def main():
     # Start the server
     import uvicorn
     uvicorn.run(
-        "main:app",
+        "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=enable_reload,

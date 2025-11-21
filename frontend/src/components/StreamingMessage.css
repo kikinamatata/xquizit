@@ -1,0 +1,119 @@
+/* StreamingMessage Component Styles */
+
+/* Streaming message animation */
+.streaming-message {
+  animation: streamingSlideIn 0.3s ease-out;
+}
+
+@keyframes streamingSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Streaming cursor (blinking cursor effect) */
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: currentColor;
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  50.01%, 100% {
+    opacity: 0;
+  }
+}
+
+/* Streaming indicator badge */
+.streaming-indicator-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.streaming-dot {
+  width: 6px;
+  height: 6px;
+  background-color: currentColor;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+.streaming-label {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Add subtle glow effect while streaming */
+.streaming-message.is-streaming .message-bubble {
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.2);
+  animation: subtleGlow 2s ease-in-out infinite;
+}
+
+@keyframes subtleGlow {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.2);
+  }
+  50% {
+    box-shadow: 0 2px 12px rgba(74, 144, 226, 0.3);
+  }
+}
+
+/* Smooth text appearance for each new word (optional enhancement) */
+.message-text {
+  /* This can be enhanced with word-by-word animation if needed */
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Ensure cursor doesn't cause layout shifts */
+.streaming-cursor {
+  position: relative;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .streaming-indicator-badge {
+    font-size: 10px;
+  }
+
+  .streaming-dot {
+    width: 5px;
+    height: 5px;
+  }
+}

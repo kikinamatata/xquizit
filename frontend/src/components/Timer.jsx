@@ -10,11 +10,18 @@ const Timer = ({ startTime, totalDuration = 1800 }) => {
     const interval = setInterval(() => {
       const now = Date.now();
       const elapsed = Math.floor((now - startTime) / 1000);
-      setElapsedSeconds(elapsed);
+
+      // Stop timer at max duration
+      if (elapsed >= totalDuration) {
+        setElapsedSeconds(totalDuration);
+        clearInterval(interval);
+      } else {
+        setElapsedSeconds(elapsed);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, totalDuration]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);

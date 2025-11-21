@@ -21,6 +21,11 @@ class InterviewState(TypedDict):
     """
     State schema for the LangGraph interview workflow.
     Uses TypedDict for LangGraph compatibility.
+
+    Implements Hybrid Modular State Machine architecture with:
+    - Strategic time allocation
+    - Conversational turn handling
+    - Quality-driven assessments
     """
     # Session identification
     session_id: str
@@ -28,20 +33,19 @@ class InterviewState(TypedDict):
     # Document content
     resume_text: str
     job_description_text: str
+    custom_instructions: str  # Custom guidance for interview strategy (empty string if not provided)
 
     # Conversation tracking
     messages: Annotated[List[Dict[str, Any]], add_messages]
 
-    # Interview strategy and context
-    interview_strategy: str
+    # V3 Interview strategy and context
+    interview_time_strategy: str  # JSON serialized InterviewTimeStrategy
     key_topics: List[str]
     questions_asked: int
 
     # Current state
     current_question: Optional[str]
     current_topic: Optional[str]
-    needs_followup: bool
-    topic_followup_counts: Dict[str, int]  # Track follow-up count per topic
 
     # Time tracking
     start_time: float
@@ -51,21 +55,55 @@ class InterviewState(TypedDict):
     is_concluded: bool
     conclusion_reason: Optional[str]
 
+    # Strategic Time Allocation
+    interview_time_strategy: Optional[str]  # JSON serialized InterviewTimeStrategy schema
+    topic_statistics: Dict[str, Dict[str, Any]]  # Per-topic tracking: questions, time, coverage, etc.
+    # Example topic_statistics:
+    # {
+    #   "Python Programming": {
+    #       "questions_asked": 3,
+    #       "time_spent_minutes": 7.5,
+    #       "assessment_complete": False,
+    #       "coverage": 0.75,
+    #       "confidence": 0.8,
+    #       "last_quality_assessment": {...}
+    #   }
+    # }
+
+    # Conversational Turn Handling
+    last_turn_analysis: Optional[str]  # JSON serialized ConversationalTurnAnalysis
+    pending_clarification: bool  # True if candidate requested clarification
+    pending_continuation: bool  # True if waiting for candidate to continue/complete thought
+
+    # Topic Quality Tracking
+    current_topic_quality: Optional[str]  # JSON serialized TopicAssessmentQuality
+    topics_completed: List[str]  # Topics marked as adequately assessed
+    critical_topics_covered: List[str]  # Critical priority topics that have been covered
+
 
 class SessionData(BaseModel):
     """Data stored for each interview session."""
     session_id: str
     resume_text: str
     job_description_text: str
+    custom_instructions: Optional[str] = None
     conversation_history: List[Message] = Field(default_factory=list)
-    interview_strategy: Optional[str] = None
+    interview_time_strategy: Optional[str] = None  # V3: JSON serialized InterviewTimeStrategy
     key_topics: List[str] = Field(default_factory=list)
     questions_asked: int = 0
-    topic_followup_counts: Dict[str, int] = Field(default_factory=dict)
     start_time: Optional[datetime] = None
     is_active: bool = True
     is_concluded: bool = False
     conclusion_reason: Optional[str] = None
+
+    # Current state tracking (persisted between graph invocations)
+    current_topic: Optional[str] = None  # Current topic being discussed
+    current_question: Optional[str] = None  # Last question asked
+
+    # Strategic fields
+    topic_statistics: Dict[str, Dict[str, Any]] = Field(default_factory=dict)  # Per-topic tracking
+    topics_completed: List[str] = Field(default_factory=list)  # Completed topics
+    critical_topics_covered: List[str] = Field(default_factory=list)  # Critical priority topics covered
 
 
 class UploadDocumentsRequest(BaseModel):
@@ -79,6 +117,8 @@ class UploadDocumentsResponse(BaseModel):
     message: str
     resume_length: int
     job_description_length: int
+    has_custom_instructions: bool = False
+    custom_instructions_length: int = 0
 
 
 class StartInterviewRequest(BaseModel):
@@ -91,6 +131,7 @@ class StartInterviewResponse(BaseModel):
     session_id: str
     first_question: str
     message: str
+    audio_chunks: Optional[List[str]] = Field(default=None, description="Base64-encoded audio chunks for first question")
 
 
 class TranscribeAudioRequest(BaseModel):
@@ -134,3 +175,19 @@ class ErrorResponse(BaseModel):
     """Standard error response model."""
     error: str
     detail: Optional[str] = None
+
+
+class TranscriptionSegment(BaseModel):
+    """Represents a transcription segment from WhisperLive."""
+    text: str = Field(..., description="Transcribed text")
+    start: float = Field(..., description="Start time in seconds")
+    end: float = Field(..., description="End time in seconds")
+    is_final: bool = Field(..., description="Whether this is a finalized segment or partial")
+
+
+class TranscriptionMessage(BaseModel):
+    """WebSocket message for real-time transcription updates."""
+    type: str = Field(..., description="Message type: 'transcript', 'complete', 'error'")
+    text: Optional[str] = Field(None, description="Transcribed text (for transcript type)")
+    segment: Optional[TranscriptionSegment] = Field(None, description="Full segment details")
+    error: Optional[str] = Field(None, description="Error message (for error type)")

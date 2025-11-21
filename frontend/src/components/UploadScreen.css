@@ -213,6 +213,97 @@
   animation: spin 1s linear infinite;
 }
 
+/* Custom Instructions Section */
+.custom-instructions-section {
+  margin-bottom: 30px;
+  padding: 24px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.custom-instructions-section .section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.custom-instructions-section h2 {
+  font-size: 18px;
+  color: #2c3e50;
+  margin: 0;
+  font-weight: 600;
+}
+
+.helper-text {
+  font-size: 13px;
+  color: #6c757d;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.custom-instructions-textarea {
+  width: 100%;
+  padding: 14px;
+  border: 2px solid #cbd5e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 120px;
+  transition: all 0.3s ease;
+  background: white;
+  box-sizing: border-box;
+}
+
+.custom-instructions-textarea:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.custom-instructions-textarea::placeholder {
+  color: #adb5bd;
+}
+
+.character-counter-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.character-counter {
+  font-size: 12px;
+  color: #6c757d;
+  transition: color 0.3s ease;
+}
+
+.character-counter.character-warning {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.length-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #856404;
+}
+
+.warning-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
 @media (max-width: 768px) {
   .upload-container {
     padding: 24px;
@@ -224,5 +315,13 @@
 
   .upload-sections {
     grid-template-columns: 1fr;
+  }
+
+  .custom-instructions-section {
+    padding: 16px;
+  }
+
+  .custom-instructions-textarea {
+    font-size: 16px;
   }
 }
