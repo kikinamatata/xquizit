@@ -198,13 +198,15 @@ const AudioRecorder = forwardRef(({ sessionId, onTranscriptionComplete, onLiveTr
               if (finalText) {
                 console.log('🚀 Auto-submitting transcription:', finalText.substring(0, 50) + '...');
 
-                // Add try-catch for error handling
-                try {
-                  onTranscriptionComplete(finalText, stopRecordingTimestampRef.current);
-                } catch (error) {
-                  console.error('❌ Error in onTranscriptionComplete:', error);
-                  setError('Failed to submit transcription. Please try again.');
-                }
+                // Defer to avoid setState during render warning
+                setTimeout(() => {
+                  try {
+                    onTranscriptionComplete(finalText, stopRecordingTimestampRef.current);
+                  } catch (error) {
+                    console.error('❌ Error in onTranscriptionComplete:', error);
+                    setError('Failed to submit transcription. Please try again.');
+                  }
+                }, 0);
               } else {
                 console.error('❌ No speech detected in transcription');
                 setError('No speech detected. Please try again.');

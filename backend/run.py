@@ -34,30 +34,21 @@ def check_env_file():
         print("ERROR: .env file not found!")
         print("\nPlease create a .env file with your API keys:")
         print("  1. Copy .env.example to .env")
-        print("  2. Add your Gemini and DeepInfra API keys to the .env file")
+        print("  2. Add your Gemini API key to the .env file")
         print("\nExample .env content:")
         print("  GEMINI_API_KEY=your_gemini_api_key_here")
-        print("  DEEPINFRA_API_KEY=your_deepinfra_api_key_here")
         return False
 
-    # Check if API keys are set
+    # Check if API key is set
     from dotenv import load_dotenv
     load_dotenv(env_path)
 
     gemini_key = os.getenv("GEMINI_API_KEY")
-    deepinfra_key = os.getenv("DEEPINFRA_API_KEY")
 
-    missing_keys = []
-    if not gemini_key or gemini_key == "your_gemini_api_key_here":
-        missing_keys.append("GEMINI_API_KEY")
-    if not deepinfra_key or deepinfra_key == "your_deepinfra_api_key_here":
-        missing_keys.append("DEEPINFRA_API_KEY")
-
-    if missing_keys:
-        print(f"ERROR: {', '.join(missing_keys)} not properly configured in .env file!")
-        print("\nPlease set valid API keys in your .env file:")
-        print("  - Gemini API Key: https://aistudio.google.com/app/apikey")
-        print("  - DeepInfra API Key: https://deepinfra.com/dash/api_keys")
+    if not gemini_key or gemini_key in ("your_gemini_api_key_here", "your_google_gemini_api_key_here"):
+        print("ERROR: GEMINI_API_KEY not properly configured in .env file!")
+        print("\nPlease set your Gemini API key in .env file:")
+        print("  - Get API key: https://aistudio.google.com/app/apikey")
         return False
 
     print("✓ Environment configuration looks good")
@@ -141,10 +132,11 @@ The backend now exclusively uses the V3 Hybrid Modular State Machine architectur
     print()
     print("Starting server...")
     print()
+    port = int(os.getenv("PORT", "8001"))
     print("API will be available at:")
-    print("  - http://localhost:8000")
-    print("  - API docs: http://localhost:8000/docs")
-    print("  - ReDoc: http://localhost:8000/redoc")
+    print(f"  - http://localhost:{port}")
+    print(f"  - API docs: http://localhost:{port}/docs")
+    print(f"  - ReDoc: http://localhost:{port}/redoc")
     print()
     if enable_reload:
         print("NOTE: Auto-reload is ENABLED (UVICORN_RELOAD=true)")
@@ -162,7 +154,7 @@ The backend now exclusively uses the V3 Hybrid Modular State Machine architectur
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=enable_reload,
         log_level="info",
         timeout_graceful_shutdown=5

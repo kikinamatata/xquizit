@@ -38,17 +38,12 @@ from app.core.models import (
 from app.services.document_processor import extract_text_from_document, DocumentProcessingError
 from app.core.graph import create_interview_graph_v3, InterviewGraphBuilderV3
 from app.services.tts_service import initialize_tts_service, get_tts_service, cleanup_tts_service
-from app.services.transcription_service import (
-    initialize_runpod_service,
-    get_runpod_service,
-    cleanup_runpod_service,
+from app.services.embedded_whisper_service import (
+    initialize_embedded_whisper_service,
+    get_embedded_whisper_service,
+    cleanup_embedded_whisper_service,
+    EmbeddedWhisperService,
 )
-from app.services.local_whisper_service import (
-    initialize_local_whisper_service,
-    get_local_whisper_service,
-    cleanup_local_whisper_service,
-)
-from app.services.base_transcription_service import TranscriptionService
 from app.utils.timing import time_operation, TimingSummary
 from app.utils.logging_config import setup_logging, get_logger
 from app.utils.metrics import (
@@ -71,7 +66,7 @@ logger = logging.getLogger(__name__)
 settings: Optional[Settings] = None
 interview_graph: Optional[InterviewGraphBuilderV3] = None
 sessions: Dict[str, SessionData] = {}
-transcription_service: Optional[TranscriptionService] = None
+transcription_service: Optional[EmbeddedWhisperService] = None
 
 
 @asynccontextmanager
@@ -96,44 +91,40 @@ async def lifespan(app: FastAPI):
         logger.info("  → Hybrid Modular State Machine Architecture")
         logger.info("  → Features: Conversational turn handling + Strategic time allocation + Quality-driven follow-ups")
 
-        # Initialize TTS service using factory pattern
-        tts_backend = settings.tts_backend.lower()
-        logger.info(f"Initializing TTS service (backend={tts_backend})...")
+        # Initialize Indic Parler-TTS service
+        logger.info("Initializing Indic Parler-TTS service...")
 
         try:
-            if tts_backend == "kokoro":
-                initialize_tts_service(
-                    backend="kokoro",
-                    device=settings.tts_device,
-                    voice=settings.kokoro_voice,
-                    speed=settings.kokoro_speed
-                )
-                logger.info("✓ TTS service initialized successfully with Kokoro")
-                logger.info(f"  - Device: {settings.tts_device}")
-                logger.info(f"  - Voice: {settings.kokoro_voice}")
-                logger.info(f"  - Speed: {settings.kokoro_speed}")
-
-            elif tts_backend == "websocket":
-                initialize_tts_service(
-                    backend="websocket",
-                    server_url=settings.tts_server_url
-                )
-                logger.info("✓ TTS service initialized successfully with WebSocket")
-                logger.info(f"  - Server URL: {settings.tts_server_url}")
-                logger.info("  - Note: Will connect to server on first use")
-
-            else:
-                logger.error(f"✗ Unknown TTS backend: {tts_backend}")
-                logger.error("  Valid options: 'kokoro', 'websocket'")
-                logger.warning("  → Streaming will be text-only (no audio)")
+            initialize_tts_service(
+                # Model selection
+                model_id=settings.parler_model_id,
+                # Core parameters
+                device=settings.parler_device,
+                voice_description=settings.parler_voice_description,
+                play_steps_in_s=settings.parler_play_steps_in_s,
+                # Generation parameters
+                temperature=settings.parler_temperature,
+                top_p=settings.parler_top_p,
+                repetition_penalty=settings.parler_repetition_penalty,
+                min_new_tokens=settings.parler_min_new_tokens,
+                max_new_tokens=settings.parler_max_new_tokens,
+                # Performance optimization
+                enable_compile=settings.parler_enable_compile,
+                # Preload model at startup for instant TTS
+                preload=True
+            )
+            logger.info("✓ TTS service initialized successfully with Indic Parler-TTS")
+            logger.info(f"  - Device: {settings.parler_device}")
+            logger.info(f"  - Voice: {settings.parler_voice_description[:60]}...")
+            logger.info(f"  - Play steps: {int(91 * settings.parler_play_steps_in_s)} (~{int(settings.parler_play_steps_in_s * 1000)}ms target TTFA)")
+            logger.info(f"  - Temperature: {settings.parler_temperature}")
+            logger.info(f"  - torch.compile: {'Enabled' if settings.parler_enable_compile else 'Disabled'}")
+            logger.info(f"  - Max tokens: {settings.parler_max_new_tokens} (~{int(settings.parler_max_new_tokens / 91)}s audio)")
 
         except ImportError as e:
-            logger.error(f"✗ TTS backend '{tts_backend}' dependencies not installed!")
+            logger.error("✗ Parler-TTS dependencies not installed!")
             logger.error(f"  Error: {str(e)}")
-            if tts_backend == "kokoro":
-                logger.error("  Please install with: pip install realtimetts[kokoro]")
-            elif tts_backend == "websocket":
-                logger.error("  Please install with: pip install websockets")
+            logger.error("  Please install with: pip install git+https://github.com/huggingface/parler-tts.git")
             logger.warning("  → Streaming will be text-only (no audio)")
 
         except Exception as e:
@@ -143,78 +134,31 @@ async def lifespan(app: FastAPI):
             import traceback
             logger.debug(traceback.format_exc())
 
-        # Initialize transcription service (RunPod or Local WhisperLive)
-        backend = settings.transcription_backend.lower()
-        logger.info(f"Initializing transcription service (backend={backend})...")
+        # Initialize embedded whisper transcription service
+        logger.info("Initializing embedded whisper transcription service...")
 
         try:
-            if backend == "runpod":
-                # Initialize RunPod transcription service
-                if not settings.runpod_endpoint_id or not settings.runpod_api_key:
-                    raise ValueError("RUNPOD_ENDPOINT_ID and RUNPOD_API_KEY are required for RunPod backend")
-
-                transcription_service = initialize_runpod_service(
-                    runpod_endpoint_id=settings.runpod_endpoint_id,
-                    runpod_api_key=settings.runpod_api_key,
-                    lang=settings.whisperlive_language,
-                    model=settings.whisperlive_model,
-                    use_vad=settings.whisperlive_use_vad,
-                    no_speech_thresh=settings.whisperlive_no_speech_thresh,
-                    same_output_threshold=settings.whisperlive_same_output_threshold,
-                    transcription_interval=settings.whisperlive_transcription_interval,
-                    max_buffer_seconds=settings.runpod_max_buffer_seconds,
-                    transcription_logging_enabled=settings.transcription_logging_enabled
-                )
-                logger.info("✓ RunPod transcription service initialized successfully")
-                logger.info(f"  - Endpoint: {settings.runpod_endpoint_id[:8]}...")
-                logger.info(f"  - Model: {settings.whisperlive_model}")
-                logger.info(f"  - Language: {settings.whisperlive_language}")
-                logger.info(f"  - VAD enabled: {settings.whisperlive_use_vad}")
-
-            elif backend == "local":
-                # Initialize local WhisperLive transcription service
-                if not settings.whisperlive_server_url and not settings.whisperlive_server_host:
-                    raise ValueError("Either WHISPERLIVE_SERVER_URL or WHISPERLIVE_SERVER_HOST is required for local backend")
-
-                transcription_service = initialize_local_whisper_service(
-                    server_url=settings.whisperlive_server_url,
-                    server_host=settings.whisperlive_server_host,
-                    server_port=settings.whisperlive_server_port,
-                    use_ssl=settings.whisperlive_use_ssl,
-                    lang=settings.whisperlive_language,
-                    model=settings.whisperlive_model,
-                    use_vad=settings.whisperlive_use_vad,
-                    no_speech_thresh=settings.whisperlive_no_speech_thresh,
-                    send_last_n_segments=settings.whisperlive_send_last_n_segments,
-                    same_output_threshold=settings.whisperlive_same_output_threshold,
-                    clip_audio=settings.whisperlive_clip_audio,
-                    chunking_mode=settings.whisperlive_chunking_mode,
-                    chunk_interval=settings.whisperlive_chunk_interval,
-                    enable_translation=settings.whisperlive_enable_translation,
-                    target_language=settings.whisperlive_target_language,
-                    transcription_logging_enabled=settings.transcription_logging_enabled
-                )
-                logger.info("✓ Local WhisperLive transcription service initialized successfully")
-                if settings.whisperlive_server_url:
-                    logger.info(f"  - Server URL: {settings.whisperlive_server_url}")
-                else:
-                    logger.info(f"  - Server: {settings.whisperlive_server_host}:{settings.whisperlive_server_port}")
-                logger.info(f"  - Protocol: {'wss' if settings.whisperlive_use_ssl else 'ws'}://")
-                logger.info(f"  - Model: {settings.whisperlive_model}")
-                logger.info(f"  - Language: {settings.whisperlive_language}")
-                logger.info(f"  - VAD enabled: {settings.whisperlive_use_vad}")
-
-            else:
-                raise ValueError(f"Unknown transcription backend: {backend}. Must be 'runpod' or 'local'")
+            transcription_service = initialize_embedded_whisper_service(
+                model_name=settings.whisper_model,
+                device=settings.whisper_device,
+                compute_type=settings.whisper_compute_type,
+                language=settings.whisper_language,
+                use_vad=settings.whisper_use_vad,
+                no_speech_thresh=settings.whisper_no_speech_thresh,
+                chunk_interval=settings.whisper_chunk_interval,
+                same_output_threshold=settings.whisper_same_output_threshold,
+            )
+            logger.info("✓ Embedded whisper transcription service initialized successfully")
+            logger.info(f"  - Model: {settings.whisper_model}")
+            logger.info(f"  - Device: {settings.whisper_device}")
+            logger.info(f"  - Compute type: {settings.whisper_compute_type}")
+            logger.info(f"  - Language: {settings.whisper_language}")
+            logger.info(f"  - VAD enabled: {settings.whisper_use_vad}")
 
         except Exception as e:
             logger.error(f"✗ Failed to initialize transcription service: {str(e)}")
             logger.error(f"  Error type: {type(e).__name__}")
             logger.warning("  → Real-time transcription will not be available")
-            if backend == "runpod":
-                logger.warning("  → Ensure RUNPOD_ENDPOINT_ID and RUNPOD_API_KEY are configured correctly")
-            else:
-                logger.warning("  → Ensure WHISPERLIVE_SERVER_HOST is configured and server is running")
             import traceback
             logger.debug(traceback.format_exc())
 
@@ -231,11 +175,11 @@ async def lifespan(app: FastAPI):
         sessions.clear()
         logger.info("Cleared session data")
 
-        # Cleanup transcription service (RunPod or Local WhisperLive)
+        # Cleanup embedded whisper transcription service
         try:
             if transcription_service:
                 await transcription_service.close_all()
-                transcription_service = None
+                cleanup_embedded_whisper_service()
                 logger.info("Transcription service cleaned up")
         except Exception as e:
             logger.error(f"Error cleaning up transcription service: {str(e)}")
@@ -296,7 +240,7 @@ async def health_check():
         "components": {
             "interview_graph": interview_graph is not None,
             "tts_service": get_tts_service() is not None,
-            "transcription_service": get_runpod_service() is not None,
+            "transcription_service": transcription_service is not None,
         },
         "metrics": {
             "active_sessions": len(sessions),
@@ -591,9 +535,7 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str):
     """
     WebSocket endpoint for real-time audio transcription.
 
-    Supports multiple backends:
-    - RunPod: Serverless transcription via HTTP API
-    - Local WhisperLive: WebSocket connection to local server
+    Uses embedded faster-whisper for low-latency, in-process transcription.
 
     Flow:
     1. Accept WebSocket connection from frontend
@@ -634,7 +576,7 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str):
     transcription_session = None
 
     try:
-        # Get transcription service (RunPod or Local WhisperLive)
+        # Get embedded whisper transcription service
         if not transcription_service:
             raise RuntimeError("Transcription service not initialized")
 
@@ -661,7 +603,7 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str):
         transcription_session = transcription_service.create_session(
             session_id=session_id,
             fastapi_websocket=websocket,
-            callback=lambda data: asyncio.create_task(transcription_callback(data))
+            callback=transcription_callback
         )
 
         # Connect to transcription backend
@@ -1098,16 +1040,16 @@ async def stream_answer(session_id: str, answer: str):
                     # Send text chunk via SSE
                     yield f"event: text_chunk\ndata: {json.dumps({'chunk': chunk_text})}\n\n"
 
-                    # Small delay for streaming effect
-                    await asyncio.sleep(0.05)
+                    # Reduced delay for faster streaming
+                    await asyncio.sleep(0.02)
 
-                    # Check for complete sentences and generate TTS
-                    sentence = _extract_complete_sentence(sentence_buffer)
-                    if sentence:
-                        sentence_buffer = sentence_buffer[len(sentence):].lstrip()
+                    # Check for speakable chunks (sentences for natural breaks)
+                    speakable = _extract_speakable_chunk(sentence_buffer, min_chars=20, use_clauses=True)
+                    if speakable:
+                        sentence_buffer = sentence_buffer[len(speakable):].lstrip()
                         try:
                             tts_service = get_tts_service()
-                            async for audio_event in tts_service.generate_stream(sentence, audio_index=audio_index):
+                            async for audio_event in tts_service.generate_stream(speakable, audio_index=audio_index):
                                 yield f"event: audio_chunk\ndata: {json.dumps(audio_event)}\n\n"
                             audio_index += 1
                         except Exception as e:
@@ -1157,7 +1099,7 @@ async def stream_answer(session_id: str, answer: str):
                     # Send text chunk to client (named SSE event)
                     yield f"event: text_chunk\ndata: {json.dumps({'chunk': text_content})}\n\n"
 
-                    # Send to TTS IMMEDIATELY (no buffering for near-zero latency)
+                    # Send to TTS for streaming audio generation
                     try:
                         tts_service = get_tts_service()
                         async for audio_event in tts_service.generate_stream(text_content, audio_index=audio_index):
@@ -1233,6 +1175,43 @@ def _extract_complete_sentence(text: str) -> Optional[str]:
         return match.group(1)
 
     # Check if the entire buffer ends with punctuation (last sentence)
+    if text.rstrip() and text.rstrip()[-1] in '.!?':
+        return text.rstrip()
+
+    return None
+
+
+def _extract_speakable_chunk(text: str, min_chars: int = 20, use_clauses: bool = True) -> Optional[str]:
+    """
+    Extract a speakable chunk from text buffer for faster TTS triggering.
+
+    Supports both sentence boundaries and clause boundaries (commas, semicolons, colons)
+    for lower latency audio generation.
+
+    Args:
+        text: Text buffer to check
+        min_chars: Minimum characters before triggering (prevents tiny chunks)
+        use_clauses: If True, also split on clause boundaries (,;:) not just sentences
+
+    Returns:
+        Speakable text chunk if found, None otherwise
+    """
+    if len(text) < min_chars:
+        return None
+
+    # First priority: complete sentences
+    match = re.search(r'^(.*?[.!?])\s+', text)
+    if match:
+        return match.group(1)
+
+    # Second priority: clause boundaries (for faster streaming)
+    if use_clauses:
+        # Look for clause-ending punctuation with min length
+        clause_match = re.search(r'^(.{' + str(min_chars) + r',}?[,;:])\s+', text)
+        if clause_match:
+            return clause_match.group(1)
+
+    # Final sentence (ends with punctuation, no trailing space)
     if text.rstrip() and text.rstrip()[-1] in '.!?':
         return text.rstrip()
 

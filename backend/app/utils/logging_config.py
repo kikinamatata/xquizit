@@ -146,15 +146,13 @@ def setup_logging(
 
     # Configure transcription logging based on flag
     if not transcription_logging_enabled:
-        # Suppress verbose RunPod backend logs (intervals, API calls, metrics, segments)
-        logging.getLogger("integrations.whisper_live.backend.runpod_backend").setLevel(logging.WARNING)
-        logging.getLogger("integrations.whisper_live.backend.base").setLevel(logging.WARNING)
-        logging.getLogger("app.services.transcription_service").setLevel(logging.INFO)  # Keep service-level logs
+        # Suppress verbose embedded whisper logs
+        logging.getLogger("app.services.embedded_whisper_service").setLevel(logging.WARNING)
+        logging.getLogger("faster_whisper").setLevel(logging.WARNING)
     else:
         # Keep all transcription logs at INFO level for debugging
-        logging.getLogger("integrations.whisper_live.backend.runpod_backend").setLevel(logging.INFO)
-        logging.getLogger("integrations.whisper_live.backend.base").setLevel(logging.INFO)
-        logging.getLogger("app.services.transcription_service").setLevel(logging.INFO)
+        logging.getLogger("app.services.embedded_whisper_service").setLevel(logging.INFO)
+        logging.getLogger("faster_whisper").setLevel(logging.INFO)
 
 
 def get_logger(name: str, **context) -> logging.Logger:

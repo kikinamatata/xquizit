@@ -106,6 +106,7 @@ sessions/
 *secret*
 *key*.txt
 credentials.json
+backend/chatterbox
 
 # Package manager lock files (optional - uncomment if needed)
 # package-lock.json
