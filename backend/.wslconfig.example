@@ -1,0 +1,91 @@
+# .wslconfig Example for xquizit GPU-Optimized Backend
+#
+# This file should be placed at: C:\Users\YOUR_USERNAME\.wslconfig (Windows side)
+#
+# After creating this file, restart WSL with:
+#   wsl --shutdown
+# Then wait 8 seconds and relaunch WSL.
+#
+# Verify memory allocation with: free -h
+# Expected output: ~20GB total memory
+
+[wsl2]
+# Memory allocation (20GB recommended for Flash Attention compilation)
+# Adjust based on your system (leave ~10-12GB for Windows)
+# For 32GB+ systems: memory=20GB
+# For 16GB systems: memory=12GB
+memory=20GB
+
+# CPU core limit
+# Set to number of physical cores minus 2 (leave some for Windows)
+# For 8-core system: processors=6
+# For 6-core system: processors=4
+processors=6
+
+# Swap space (provides additional virtual memory during compilation)
+# 8GB is recommended for Flash Attention compilation
+swap=8GB
+
+# Swap file location (ensure parent directory exists)
+swapFile=C:\\temp\\wsl-swap.vhdx
+
+# Network settings
+localhostForwarding=true
+
+# CRITICAL: Disable aggressive memory reclamation
+# This prevents WSL from crashing during memory-intensive operations
+# like Flash Attention compilation
+pageReporting=false
+
+# Enable GUI applications support (optional, but useful)
+guiApplications=true
+
+# Advanced options (uncomment if needed)
+# kernelCommandLine = ""
+# pageReporting=false
+# vmIdleTimeout=-1  # Never shut down idle WSL instances
+
+# Performance tuning (uncomment if you have performance issues)
+# nestedVirtualization=true
+# debugConsole=false
+
+################################################################################
+# Notes
+################################################################################
+#
+# Why is this configuration needed?
+# ---------------------------------
+# Flash Attention 2 compilation is extremely memory-intensive:
+# - Single-threaded (MAX_JOBS=1): ~6-8GB RAM for 30-60 minutes
+# - Multi-threaded (MAX_JOBS=4): ~15-20GB RAM for 15-20 minutes
+#
+# WSL2 default configuration:
+# - Uses 50% of Windows RAM (16GB on a 32GB system)
+# - Aggressive memory reclamation (pageReporting=true)
+# - Can cause kernel panic during sustained high memory usage
+#
+# This configuration:
+# - Allocates 20GB to WSL (62% of 32GB system RAM)
+# - Disables aggressive memory reclamation (pageReporting=false)
+# - Provides 8GB swap as safety buffer
+# - Prevents WSL crashes during compilation
+#
+# Troubleshooting
+# --------------
+# If WSL still crashes during flash-attn installation:
+# 1. Increase memory to 24GB (if you have 32GB+ RAM)
+# 2. Close Windows applications to free up RAM
+# 3. Check Task Manager during compilation (should stay < 28GB used)
+# 4. Try installing without Flash Attention (still get 4x from torch.compile)
+#
+# If WSL fails to start after creating .wslconfig:
+# 1. Check syntax (no spaces around = signs in [wsl2] section)
+# 2. Ensure paths use double backslashes (C:\\temp, not C:\temp)
+# 3. Verify swap parent directory exists (create C:\temp if missing)
+# 4. Try reducing memory allocation
+#
+# Resources
+# ---------
+# - WSL Configuration docs: https://docs.microsoft.com/en-us/windows/wsl/wsl-config
+# - CUDA on WSL: https://docs.nvidia.com/cuda/wsl-user-guide/
+# - WSL GPU support: https://docs.nvidia.com/cuda/wsl-user-guide/index.html#getting-started-with-cuda-on-wsl

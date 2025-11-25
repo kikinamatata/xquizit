@@ -1,0 +1,183 @@
+# GPU-Optimized Requirements for Linux and WSL
+# This file contains exact installation commands for CUDA optimized setup
+#
+# ============================================================================
+# WSL USERS: READ THIS FIRST!
+# ============================================================================
+# If you're using Windows Subsystem for Linux (WSL2):
+#   1. Use setup_wsl.sh instead of setup_linux.sh
+#   2. Install PyTorch with CUDA 12.1 (compatible with CUDA 13.0 runtime)
+#   3. Set MAX_JOBS=1 for Flash Attention to prevent WSL crash
+#   4. Configure .wslconfig (see C:\Users\YOUR_USERNAME\.wslconfig)
+#   5. No need to install CUDA Toolkit (uses Windows CUDA passthrough)
+#
+# NATIVE LINUX USERS:
+#   - Use setup_linux.sh
+#   - Install CUDA 12.8 Toolkit
+#   - Follow installation steps below
+# ============================================================================
+#
+# Prerequisites:
+#   NATIVE LINUX:
+#     - NVIDIA Driver >= 545
+#     - CUDA 12.8 Toolkit installed
+#     - Python 3.12
+#     - Virtual environment activated
+#
+#   WSL2:
+#     - NVIDIA Driver >= 545 (Windows side)
+#     - CUDA 13.0 runtime (Windows passthrough)
+#     - .wslconfig configured (memory=20GB, pageReporting=false)
+#     - Python 3.12
+#     - Virtual environment activated
+#
+# Installation order:
+#   1. Install base requirements: pip install -r requirements.txt (without torch)
+#   2. Install PyTorch with CUDA: (see below - different for WSL vs native)
+#   3. Install GPU-specific packages: (see below)
+#   4. Install Parler-TTS: pip install git+https://github.com/huggingface/parler-tts.git
+#
+# Usage:
+#   WSL: Run setup_wsl.sh which handles WSL-specific configuration
+#   Native Linux: Run setup_linux.sh which automates this process
+#   Manual installation (Native Linux):
+#
+#   # Step 1: Remove any existing PyTorch
+#   pip uninstall -y torch torchvision torchaudio
+#
+#   # Step 2: Install PyTorch with CUDA 12.8 support (NATIVE LINUX)
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+#
+#   # Step 3: Install Triton (usually comes with PyTorch 2.5+)
+#   pip install triton>=2.1.0
+#
+#   # Step 4: Install Flash Attention 2 (15-20 min compile time, NATIVE LINUX)
+#   # Set environment variables first:
+#   export CUDA_HOME=/usr/local/cuda-12.8
+#   export MAX_JOBS=4  # Native Linux can use parallel jobs
+#   pip install flash-attn>=2.5.0 --no-build-isolation
+#
+#   Manual installation (WSL):
+#
+#   # Step 1: Remove any existing PyTorch
+#   pip uninstall -y torch torchvision torchaudio
+#
+#   # Step 2: Install PyTorch with CUDA 12.1 support (WSL - compatible with CUDA 13.0)
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+#
+#   # Step 3: Install Triton (usually comes with PyTorch 2.5+)
+#   pip install triton>=2.1.0
+#
+#   # Step 4: Install Flash Attention 2 (30-60 min compile time, WSL)
+#   # CRITICAL: Use MAX_JOBS=1 to prevent WSL crash
+#   export CUDA_HOME=/usr/lib/wsl/lib
+#   export MAX_JOBS=1  # CRITICAL for WSL stability!
+#   pip install flash-attn>=2.5.0 --no-build-isolation -v
+#
+#   # Step 5: Install Parler-TTS
+#   pip install git+https://github.com/huggingface/parler-tts.git
+#
+#   # Step 6: Verify installation
+#   python3 -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+#   python3 -c "import flash_attn; print('Flash Attention OK')"
+#   python3 -c "import triton; print('Triton OK')"
+
+################################################################################
+# Pinned Versions for CUDA 12.8 (Python 3.12)
+################################################################################
+
+# PyTorch with CUDA 12.8 support
+# Install with: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+torch>=2.5.0
+torchvision>=0.20.0
+torchaudio>=2.5.0
+
+# Triton (JIT compiler for GPU kernels, enables torch.compile())
+triton>=2.1.0
+
+# Flash Attention 2 (optimized attention mechanism)
+# Note: Must be compiled from source for CUDA 12.8
+# Compilation requires: CUDA 12.8, ninja, packaging, wheel, python3.12-dev
+flash-attn>=2.5.0
+
+# Build dependencies (needed for Flash Attention compilation)
+ninja>=1.11.0
+packaging>=23.0
+wheel>=0.42.0
+setuptools>=69.0.0
+
+# Parler-TTS and dependencies
+# Install separately with: pip install git+https://github.com/huggingface/parler-tts.git
+transformers==4.46.1
+accelerate>=0.26.0
+soundfile>=0.12.0
+safetensors>=0.4.0
+
+# HuggingFace Hub (for model downloads)
+huggingface_hub>=0.20.0
+
+################################################################################
+# Expected Installation Sizes
+################################################################################
+# PyTorch + torchvision + torchaudio (CUDA 12.8): ~3.5 GB
+# Flash Attention 2 (compiled): ~100 MB
+# Triton: ~150 MB
+# CUDA 12.8 Toolkit: ~4 GB
+# Total additional space needed: ~8-10 GB
+
+################################################################################
+# Performance Expectations (RTX 5060 Ti)
+################################################################################
+# Without optimizations (CPU-only PyTorch):
+#   - TTS generation: ~2-3 seconds per sentence
+#   - Time-to-first-audio (TTFA): ~800ms
+#
+# With PyTorch CUDA 12.8:
+#   - TTS generation: ~500ms per sentence (4-6x faster)
+#   - TTFA: ~300ms
+#
+# With PyTorch CUDA + Flash Attention 2:
+#   - TTS generation: ~350ms per sentence (1.4x additional speedup)
+#   - TTFA: ~250ms
+#
+# With PyTorch CUDA + Flash Attention + torch.compile():
+#   - TTS generation: ~100-150ms per sentence (3-4x additional speedup)
+#   - TTFA: <200ms
+#   - Note: First run will be slower (~5-10s) due to compilation
+#
+# Combined speedup: ~15-20x faster than CPU-only
+
+################################################################################
+# Troubleshooting
+################################################################################
+
+# If Flash Attention fails to compile:
+# 1. Ensure CUDA 12.8 is properly installed: nvcc --version
+# 2. Ensure python3.12-dev is installed: sudo apt install python3.12-dev
+# 3. Check available RAM during build (needs ~8GB free)
+# 4. Try reducing MAX_JOBS: export MAX_JOBS=2
+# 5. Install without Flash Attention (still get ~4x speedup from torch.compile):
+#    - Skip flash-attn in requirements
+#    - Comment out flash_attn import checks in code
+
+# If torch.compile() fails:
+# 1. Ensure Triton is installed: python3 -c "import triton"
+# 2. Check CUDA compatibility: python3 -c "import torch; print(torch.version.cuda)"
+# 3. Set environment variable: export TORCHINDUCTOR_COMPILE_THREADS=1
+# 4. Disable compile in .env: PARLER_ENABLE_COMPILE=false
+
+# If CUDA out of memory errors occur:
+# 1. Reduce batch size in parler_tts_service.py
+# 2. Use bfloat16 instead of float32 (already enabled)
+# 3. Clear CUDA cache: torch.cuda.empty_cache()
+# 4. Monitor GPU memory: watch -n 1 nvidia-smi
+
+################################################################################
+# Environment Variables for Optimal Performance
+################################################################################
+
+# Set these in your .env file or shell:
+# PARLER_ENABLE_COMPILE=true          # Enable torch.compile() (4x speedup)
+# PARLER_DEVICE=cuda                   # Use GPU
+# CUDA_HOME=/usr/local/cuda-12.8      # CUDA installation path
+# PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True  # Better memory management
