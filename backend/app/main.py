@@ -141,6 +141,7 @@ async def lifespan(app: FastAPI):
                 no_speech_thresh=settings.whisper_no_speech_thresh,
                 chunk_interval=settings.whisper_chunk_interval,
                 same_output_threshold=settings.whisper_same_output_threshold,
+                preload=settings.whisper_preload,
             )
             logger.info("✓ Embedded whisper transcription service initialized successfully")
             logger.info(f"  - Model: {settings.whisper_model}")
@@ -148,6 +149,8 @@ async def lifespan(app: FastAPI):
             logger.info(f"  - Compute type: {settings.whisper_compute_type}")
             logger.info(f"  - Language: {settings.whisper_language}")
             logger.info(f"  - VAD enabled: {settings.whisper_use_vad}")
+            logger.info(f"  - Preload: {settings.whisper_preload}")
+            logger.info(f"  - Thread-safe shared model: {'enabled' if settings.whisper_preload else 'disabled'}")
 
         except Exception as e:
             logger.error(f"✗ Failed to initialize transcription service: {str(e)}")

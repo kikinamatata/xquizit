@@ -132,7 +132,7 @@ The backend now exclusively uses the V3 Hybrid Modular State Machine architectur
     print()
     print("Starting server...")
     print()
-    port = int(os.getenv("PORT", "8001"))
+    port = int(os.getenv("PORT", "8000"))
     print("API will be available at:")
     print(f"  - http://localhost:{port}")
     print(f"  - API docs: http://localhost:{port}/docs")

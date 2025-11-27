@@ -22,6 +22,9 @@ _vad_model = None
 
 logger = logging.getLogger(__name__)
 
+# Global lock for thread-safe model access
+_model_lock = threading.Lock()
+
 # Constants
 SAMPLE_RATE = 16000
 MAX_BUFFER_SECONDS = 45  # Rolling buffer limit
@@ -119,6 +122,9 @@ class EmbeddedWhisperSession:
         # Store reference to main event loop for thread-safe callbacks
         self.main_loop: Optional[asyncio.AbstractEventLoop] = None
 
+        # Track if using shared model for thread-safety
+        self._using_shared_model = False
+
         logger.info(f"[{session_id}] EmbeddedWhisperSession initialized")
 
     async def connect(self) -> bool:
@@ -132,32 +138,42 @@ class EmbeddedWhisperSession:
             # Store reference to main event loop for thread-safe callbacks
             self.main_loop = asyncio.get_running_loop()
 
-            logger.info(f"[{self.session_id}] Loading Whisper model: {self.model_name}")
+            # Use shared model if available (thread-safe)
+            parent_service = get_embedded_whisper_service()
+            with parent_service._model_lock:
+                if parent_service._shared_model is not None:
+                    logger.info(f"[{self.session_id}] Using preloaded shared model")
+                    self.transcriber = parent_service._shared_model
+                    device = parent_service._shared_device
+                    compute_type = parent_service._shared_compute_type
+                    self._using_shared_model = True
+                else:
+                    logger.info(f"[{self.session_id}] Loading model for this session")
+                    self._using_shared_model = False
 
-            # Import faster_whisper here to avoid slow startup
-            from faster_whisper import WhisperModel
+                    # Import faster_whisper here to avoid slow startup
+                    from faster_whisper import WhisperModel
 
-            # Determine compute type based on device
-            if self.device == "cuda" and torch.cuda.is_available():
-                device = "cuda"
-                # Check GPU compute capability
-                major, _ = torch.cuda.get_device_capability(0)
-                compute_type = "float16" if major >= 7 else "float32"
-                logger.info(f"[{self.session_id}] Using CUDA with {compute_type}")
-            else:
-                device = "cpu"
-                compute_type = "int8"
-                logger.info(f"[{self.session_id}] Using CPU with int8 quantization")
+                    # Determine compute type based on device
+                    if self.device == "cuda" and torch.cuda.is_available():
+                        device = "cuda"
+                        major, _ = torch.cuda.get_device_capability(0)
+                        compute_type = "float16" if major >= 7 else "float32"
+                        logger.info(f"[{self.session_id}] Using CUDA with {compute_type}")
+                    else:
+                        device = "cpu"
+                        compute_type = "int8"
+                        logger.info(f"[{self.session_id}] Using CPU with int8 quantization")
 
-            # Load the model
-            self.transcriber = WhisperModel(
-                self.model_name,
-                device=device,
-                compute_type=compute_type,
-                local_files_only=False,
-            )
+                    # Load the model
+                    self.transcriber = WhisperModel(
+                        self.model_name,
+                        device=device,
+                        compute_type=compute_type,
+                        local_files_only=False,
+                    )
 
-            logger.info(f"[{self.session_id}] Model loaded successfully")
+                    logger.info(f"[{self.session_id}] Model loaded successfully")
 
             # Start transcription thread
             self.trans_thread = threading.Thread(
@@ -271,16 +287,28 @@ class EmbeddedWhisperSession:
             return None
 
         try:
-            segments, info = self.transcriber.transcribe(
-                audio_chunk,
-                language=self.language,
-                task="transcribe",
-                vad_filter=self.use_vad,
-                vad_parameters={"threshold": 0.5} if self.use_vad else None,
-            )
-
-            # Convert generator to list
-            segment_list = list(segments)
+            # Thread-safe transcription when using shared model
+            parent_service = get_embedded_whisper_service()
+            if self._using_shared_model:
+                with parent_service._model_lock:
+                    segments, info = self.transcriber.transcribe(
+                        audio_chunk,
+                        language=self.language,
+                        task="transcribe",
+                        vad_filter=self.use_vad,
+                        vad_parameters={"threshold": 0.5} if self.use_vad else None,
+                    )
+                    # Convert generator to list inside lock
+                    segment_list = list(segments)
+            else:
+                segments, info = self.transcriber.transcribe(
+                    audio_chunk,
+                    language=self.language,
+                    task="transcribe",
+                    vad_filter=self.use_vad,
+                    vad_parameters={"threshold": 0.5} if self.use_vad else None,
+                )
+                segment_list = list(segments)
 
             if not segment_list:
                 return None
@@ -530,7 +558,60 @@ class EmbeddedWhisperService:
 
         self.sessions: Dict[str, EmbeddedWhisperSession] = {}
 
+        # Shared model for all sessions (thread-safe)
+        self._shared_model = None
+        self._shared_device = None
+        self._shared_compute_type = None
+        self._model_lock = _model_lock  # Reference to global lock
+
         logger.info(f"EmbeddedWhisperService initialized with model={model_name}, device={device}")
+
+    def preload(self):
+        """
+        Preload the Whisper model at startup for instant transcription.
+        Creates a shared model instance with thread-safe access.
+        Based on whisper-live's preload_model implementation.
+        """
+        with self._model_lock:
+            if self._shared_model is not None:
+                logger.info("Whisper model already preloaded")
+                return
+
+            logger.info(f"Preloading Whisper model: {self.model_name}")
+
+            try:
+                from faster_whisper import WhisperModel
+                import torch
+
+                # Determine device and compute type
+                if self.device == "cuda" and torch.cuda.is_available():
+                    device = "cuda"
+                    major, _ = torch.cuda.get_device_capability(0)
+                    compute_type = "float16" if major >= 7 else "float32"
+                    logger.info(f"Preloading model on CUDA with {compute_type}")
+                else:
+                    device = "cpu"
+                    compute_type = "int8"
+                    logger.info(f"Preloading model on CPU with int8 quantization")
+
+                # Load the shared model
+                self._shared_model = WhisperModel(
+                    self.model_name,
+                    device=device,
+                    compute_type=compute_type,
+                    local_files_only=False,
+                )
+                self._shared_device = device
+                self._shared_compute_type = compute_type
+
+                logger.info("✓ Whisper model preloaded successfully")
+                logger.info(f"  - Model: {self.model_name}")
+                logger.info(f"  - Device: {device}")
+                logger.info(f"  - Compute type: {compute_type}")
+
+            except Exception as e:
+                logger.error(f"Failed to preload Whisper model: {e}", exc_info=True)
+                self._shared_model = None
 
     def create_session(
         self,
@@ -609,6 +690,7 @@ def initialize_embedded_whisper_service(
     no_speech_thresh: float = 0.45,
     chunk_interval: float = 1.0,
     same_output_threshold: int = 5,
+    preload: bool = True,
 ) -> EmbeddedWhisperService:
     """
     Initialize the global embedded whisper transcription service.
@@ -628,6 +710,9 @@ def initialize_embedded_whisper_service(
         chunk_interval=chunk_interval,
         same_output_threshold=same_output_threshold,
     )
+
+    if preload:
+        _embedded_whisper_service.preload()
 
     return _embedded_whisper_service
 

@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     whisper_chunk_interval: float = 1.0  # Minimum seconds of audio before transcription
     whisper_same_output_threshold: int = 5  # Repeated outputs before finalizing segment
     transcription_logging_enabled: bool = True  # Enable/disable verbose transcription logs
+    whisper_preload: bool = True  # Preload model at startup for instant transcription
 
     model_config = SettingsConfigDict(
         env_file=".env",
