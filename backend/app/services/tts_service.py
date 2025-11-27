@@ -1,15 +1,13 @@
 """
 TTS Service Module
-Factory pattern for TTS service initialization using Indic Parler-TTS engine.
+Factory pattern for TTS service initialization using Chatterbox TTS engine.
 """
 
 import logging
 from typing import Optional
 
 from .base_tts_service import BaseTTSService
-from .parler_tts_service import IndicParlerTTSService
-# Keep Chatterbox import for backward compatibility (if rollback needed)
-# from .chatterbox_tts_service import ChatterboxTTSService
+from .chatterbox_tts_service import ChatterboxTTSService
 
 logger = logging.getLogger(__name__)
 
@@ -19,41 +17,36 @@ _tts_service: Optional[BaseTTSService] = None
 
 
 def initialize_tts_service(
-    # Model selection
-    model_id: str = "ai4bharat/indic-parler-tts",
+    # Voice cloning
+    reference_audio_path: str,
     # Core parameters
-    device: str = "auto",
-    voice_description: str = "Thoma speaks with a clear, moderate pace in a close recording with minimal background noise and a slightly expressive tone",
-    play_steps_in_s: float = 0.3,  # 300ms target TTFA
-    # Generation parameters
-    temperature: float = 1.0,
-    top_p: float = 1.0,
-    repetition_penalty: float = 1.0,
-    min_new_tokens: int = 10,
-    max_new_tokens: int = 2000,
+    device: str = "cuda",
+    chunk_size: int = 25,
+    context_window: int = 50,
+    fade_duration: float = 0.02,
+    # Generation quality
+    cfm_steps: int = 7,
     # Performance optimization
-    enable_compile: bool = True,
-    # Model loading
+    use_fp16: bool = True,
+    optimize_gpu: bool = True,
     preload: bool = True
 ) -> BaseTTSService:
     """
-    Initialize the global TTS service instance using Indic Parler-TTS.
+    Initialize the global TTS service instance using Chatterbox TTS.
 
     Args:
-        model_id: HuggingFace model ID (default: "ai4bharat/indic-parler-tts")
-        device: Device to run model on ('cuda', 'cpu', or 'auto')
-        voice_description: Natural language description of desired voice
-        play_steps_in_s: Target seconds for first audio chunk (lower = faster TTFA)
-        temperature: Sampling temperature (1.0 recommended)
-        top_p: Nucleus sampling probability threshold
-        repetition_penalty: Penalty for repeated tokens
-        min_new_tokens: Minimum tokens to generate
-        max_new_tokens: Maximum tokens to generate (~22s audio at 2000)
-        enable_compile: Enable torch.compile() for 4x speedup (requires warmup)
+        reference_audio_path: Path to reference audio for voice cloning (WAV recommended)
+        device: Device to run model on ('cuda' or 'cpu')
+        chunk_size: Tokens per streaming chunk (15-30, lower=faster TTFA)
+        context_window: Tokens of context for continuity
+        fade_duration: Audio fade transition in seconds (prevents clicks)
+        cfm_steps: CFM inference steps (7 for real-time, 10+ for quality)
+        use_fp16: Use half-precision for 2x speed and 50% memory reduction
+        optimize_gpu: Enable CUDA graph compilation for 30-50% speedup
         preload: If True, load model immediately at startup
 
     Returns:
-        Initialized IndicParlerTTSService instance
+        Initialized ChatterboxTTSService instance
 
     Raises:
         RuntimeError: If TTS service initialization fails
@@ -65,23 +58,21 @@ def initialize_tts_service(
         return _tts_service
 
     try:
-        logger.info(f"Initializing Indic Parler-TTS service (model={model_id}, device={device}, preload={preload})")
+        logger.info(f"Initializing Chatterbox TTS service (device={device}, preload={preload})")
 
-        _tts_service = IndicParlerTTSService(
-            model_id=model_id,
+        _tts_service = ChatterboxTTSService(
+            reference_audio_path=reference_audio_path,
             device=device,
-            voice_description=voice_description,
-            play_steps_in_s=play_steps_in_s,
-            temperature=temperature,
-            top_p=top_p,
-            repetition_penalty=repetition_penalty,
-            min_new_tokens=min_new_tokens,
-            max_new_tokens=max_new_tokens,
-            enable_compile=enable_compile,
+            chunk_size=chunk_size,
+            context_window=context_window,
+            fade_duration=fade_duration,
+            cfm_steps=cfm_steps,
+            use_fp16=use_fp16,
+            optimize_gpu=optimize_gpu,
             preload=preload
         )
 
-        logger.info("TTS service initialized successfully with Indic Parler-TTS")
+        logger.info("TTS service initialized successfully with Chatterbox TTS")
         return _tts_service
 
     except Exception as e:

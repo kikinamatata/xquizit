@@ -25,28 +25,15 @@ onnxruntime>=1.17.0
 tokenizers>=0.20.0
 huggingface_hub
 
-# Indic Parler-TTS (Indian English Text-to-Speech)
-# Install from GitHub with: pip install git+https://github.com/huggingface/parler-tts.git
-
-# Core PyTorch dependencies (GPU-optimized for Linux)
+# Core PyTorch and ML dependencies (required for TTS)
 # For CUDA 12.8 support, install with: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 # For CPU-only (Windows/macOS), the default pip install works
-torch>=2.5.0  # Upgraded from 2.2.0 for CUDA 12.8 support and torch.compile() improvements
+torch>=2.5.0
 torchaudio
-transformers==4.46.1
+transformers>=4.46.0
 soundfile>=0.12.0
 accelerate
 
-# GPU Optimization Dependencies (Linux only)
-triton>=2.1.0  # Required for torch.compile() - 4x speedup on Linux (not supported on Windows)
-flash-attn>=2.5.0  # Flash Attention 2 for 1.4x speedup (requires CUDA, ~15min compile time)
-ninja  # Build dependency for Flash Attention compilation
-packaging  # Build dependency for Flash Attention
-wheel  # Build dependency
-
-# [DEPRECATED] Chatterbox TTS (kept for rollback, uncomment if needed)
-# librosa>=0.10.0
-# soundfile>=0.12.0
-# safetensors>=0.4.0
-# transformers>=4.40.0
-# tokenizers>=0.15.0
+# Chatterbox TTS (Real-Time Streaming Text-to-Speech)
+# Install manually with: pip install chatterbox-tts
+# Note: chatterbox-tts is not included in this requirements.txt and must be installed separately

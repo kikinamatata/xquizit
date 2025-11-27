@@ -107,7 +107,7 @@ sessions/
 *key*.txt
 credentials.json
 backend/chatterbox
-
+backend/tts
 # Package manager lock files (optional - uncomment if needed)
 # package-lock.json
 # yarn.lock

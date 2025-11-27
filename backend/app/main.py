@@ -91,40 +91,34 @@ async def lifespan(app: FastAPI):
         logger.info("  → Hybrid Modular State Machine Architecture")
         logger.info("  → Features: Conversational turn handling + Strategic time allocation + Quality-driven follow-ups")
 
-        # Initialize Indic Parler-TTS service
-        logger.info("Initializing Indic Parler-TTS service...")
+        # Initialize Chatterbox TTS service
+        logger.info("Initializing Chatterbox TTS service...")
 
         try:
             initialize_tts_service(
-                # Model selection
-                model_id=settings.parler_model_id,
-                # Core parameters
-                device=settings.parler_device,
-                voice_description=settings.parler_voice_description,
-                play_steps_in_s=settings.parler_play_steps_in_s,
-                # Generation parameters
-                temperature=settings.parler_temperature,
-                top_p=settings.parler_top_p,
-                repetition_penalty=settings.parler_repetition_penalty,
-                min_new_tokens=settings.parler_min_new_tokens,
-                max_new_tokens=settings.parler_max_new_tokens,
-                # Performance optimization
-                enable_compile=settings.parler_enable_compile,
-                # Preload model at startup for instant TTS
+                reference_audio_path=settings.chatterbox_reference_audio,
+                device=settings.chatterbox_device,
+                chunk_size=settings.chatterbox_chunk_size,
+                context_window=settings.chatterbox_context_window,
+                fade_duration=settings.chatterbox_fade_duration,
+                cfm_steps=settings.chatterbox_cfm_steps,
+                use_fp16=settings.chatterbox_use_fp16,
+                optimize_gpu=settings.chatterbox_optimize_gpu,
                 preload=True
             )
-            logger.info("✓ TTS service initialized successfully with Indic Parler-TTS")
-            logger.info(f"  - Device: {settings.parler_device}")
-            logger.info(f"  - Voice: {settings.parler_voice_description[:60]}...")
-            logger.info(f"  - Play steps: {int(91 * settings.parler_play_steps_in_s)} (~{int(settings.parler_play_steps_in_s * 1000)}ms target TTFA)")
-            logger.info(f"  - Temperature: {settings.parler_temperature}")
-            logger.info(f"  - torch.compile: {'Enabled' if settings.parler_enable_compile else 'Disabled'}")
-            logger.info(f"  - Max tokens: {settings.parler_max_new_tokens} (~{int(settings.parler_max_new_tokens / 91)}s audio)")
+            logger.info("✓ TTS service initialized successfully with Chatterbox TTS")
+            logger.info(f"  - Device: {settings.chatterbox_device}")
+            logger.info(f"  - Reference audio: {settings.chatterbox_reference_audio}")
+            logger.info(f"  - Chunk size: {settings.chatterbox_chunk_size} tokens")
+            logger.info(f"  - Context window: {settings.chatterbox_context_window} tokens")
+            logger.info(f"  - CFM steps: {settings.chatterbox_cfm_steps}")
+            logger.info(f"  - FP16: {settings.chatterbox_use_fp16}")
+            logger.info(f"  - GPU optimization: {settings.chatterbox_optimize_gpu}")
 
         except ImportError as e:
-            logger.error("✗ Parler-TTS dependencies not installed!")
+            logger.error("✗ Chatterbox TTS not installed!")
             logger.error(f"  Error: {str(e)}")
-            logger.error("  Please install with: pip install git+https://github.com/huggingface/parler-tts.git")
+            logger.error("  Please install with: pip install chatterbox-tts")
             logger.warning("  → Streaming will be text-only (no audio)")
 
         except Exception as e:
